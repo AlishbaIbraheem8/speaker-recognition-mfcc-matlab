@@ -1,0 +1,475 @@
+%% *Speaker Identification by Voice Recognition*
+%% Introduction
+% Speaker recognition is the identification of a person from characteristics of voices. It is used to answer the question "Who is speaking?"
+% Speaker recognition can be classified into speaker identification and speaker verification. Speaker identification is the process of determining from which of the registered speakers a given utterance comes. Speaker verification is the process of accepting or rejecting the identity claimed by a speaker.
+% Speaker recognition methods can also be divided into text-dependent (fixed passwords) and text-independent (no specified passwords) methods. The former require the speaker to provide utterances of key words or sentences, the same text being used for both training and recognition, whereas the latter do not rely on a specific text being spoken.
+% This report is about the development and implementation of a text-independent speaker recognition system using MATLAB.
+% The speaker recognition system requires a new user to record their voice for a specified duration, which is then stored in the system's database along with existing users' voice information. To identify the user from the stored database, they need to speak a provided text, which can either be the same or different from what they spoke previously. The user also has the option to listen to their recorded voice stored in the database and delete it if desired. The system uses the stored voice data to identify and authenticate the speaker based on their unique voice characteristics. This process enables the system to accurately recognize the user and distinguish them from other users in the database.
+% Algorithm:
+% Speaker recognition is carried out in two major phases: feature extraction and feature matching.
+% Basic Steps:
+% •	The system records the user's voice and saves it in a database.
+% •	The system uses Mel-frequency cepstral coefficients (MFCC) to extract the features from the recorded voice.
+% •	The system uses vector quantization (VQ) to create a codebook and classify the speaker based on the codebook.
+
+%% Main Program
+% It displays a pop-up menu with four options: add a voice to the database, identify the speaker, display database information, or exit the program
+% If the user selects the "add a voice to the database" option, the system prompts the user to enter their name ID and records their voice. The system then extracts the MFCC features and stores them in the database.
+% If the user selects the "identify the speaker" option, the system prompts the user to record their voice. The system then extracts the MFCC features from the recorded voice and uses VQ to classify the speaker based on the codebook
+% If the user selects the "display database information" option, the system displays information about the play voices or deletes voices in the database.
+% If the user selects the "exit" option, the loop is terminated and the program exits.
+jabba=10;
+user_id=1;
+ch=0;
+poss=4;
+while ch~=poss
+    ch=menu('Speaker recognition System','Add your voice to database',...
+        'Speaker Identification','Database Info','exit');
+    if ch==1
+        %% adding a sound to the database
+        if(exist('name_database.dat','file'))
+            load('name_database.dat','-mat');
+            classe = input('Insert your name id:','s');
+            if isempty(classe)
+                classe = {'user%d',user_id};
+                user_id=user_id+1;
+                disp(classe);
+            end
+            message=('The following parameters will be used during recording:');
+            disp(message);
+            message=strcat('Sampling frequency',num2str(samplingfrequency));
+            disp(message);
+            message=strcat('Bits per sample',num2str(samplingbits));
+            disp(message);
+            durata = input('Insert the duration of the recording (in seconds):');
+            if isempty(durata)
+                durata = 3;
+                disp( num2str(durata) );
+            end
+            micrecorder = audiorecorder(samplingfrequency,samplingbits,1);
+            disp('Now, speak into microphone...');
+            recordblocking(micrecorder,durata);
+            %play(micrecorder)
+            
+            while (isrecording(micrecorder)==1)
+                disp('Recording...');
+                pause(0.5);
+            end
+            disp('Recording stopped.');
+            y1 = getaudiodata(micrecorder);
+            y = getaudiodata(micrecorder, 'uint8');
+            if size(y,2)==2
+                y=y(:,1);
+            end
+            y = double(y);
+            
+            sound_number = sound_number+1;
+            speaker_num=speaker_num+1;
+            data{sound_number,1} = y;
+            data{sound_number,4} = num2str(speaker_num);
+            data{sound_number,2} = classe;
+            data{sound_number,3} = 'Microphone';
+            st=strcat(num2str(speaker_num),'.wav');
+            audiowrite(st,y1,samplingfrequency);
+            save('name_database.dat','data','sound_number','speaker_num','-append');
+            msgbox('Sound added to database','Database result','help');
+            disp('Sound added to database');
+        else
+            classe = input('Insert your name id:','s');
+            if isempty(classe)
+                classe = {'user%d',user_id};
+                user_id=user_id+1;
+                disp(classe);
+            end
+            durata = input('Insert the duration of the recording (in seconds):');
+            if isempty(durata)
+                durata = 3;
+                disp( num2str(durata) );
+            end
+            samplingfrequency = 22050;
+            samplingbits = 8;
+            micrecorder = audiorecorder(samplingfrequency,samplingbits,1);
+            disp('Now, speak into microphone...');
+            recordblocking(micrecorder,durata);
+            
+            while (isrecording(micrecorder)==1)
+                disp('Recording...');
+                pause(0.5);
+            end
+            disp('Recording stopped.');
+            y1 = getaudiodata(micrecorder);
+            y = getaudiodata(micrecorder, 'uint8');
+            if size(y,2)==2
+                y=y(:,1);
+            end
+            
+            y = double(y);
+            sound_number = 1;
+            speaker_num=1;
+            data{sound_number,1} = y;
+            data{sound_number,4} = num2str(speaker_num);
+            data{sound_number,2} = classe;
+            data{sound_number,3} = 'Microphone';
+            st=strcat(num2str(speaker_num),'.wav');
+            audiowrite(st,y1,samplingfrequency);
+            save('name_database.dat','data','sound_number','speaker_num','samplingfrequency','samplingbits');
+            msgbox('Sound added to database','Database result','help');
+            disp('Sound added to database');
+        end
+    end
+    
+    
+    if ch==2
+        %% Voice Recognition
+        if (exist('name_database.dat','file'))
+            load('name_database.dat','-mat');
+            Fs = samplingfrequency;
+            durata = input('Insert the duration of the recording (in seconds):');
+            if isempty(durata)
+                durata = 3;
+                disp( num2str(durata) );
+            end
+            micrecorder = audiorecorder(samplingfrequency,samplingbits,1);
+            disp('Now, speak into microphone...');
+            recordblocking(micrecorder,durata);
+            
+            while (isrecording(micrecorder)==1)
+                disp('Recording...');
+                pause(0.5);
+            end
+            disp('Recording stopped.');
+            y1 = getaudiodata(micrecorder);
+            y = getaudiodata(micrecorder, 'uint8');
+            % if the input sound is not mono
+            if size(y,2)==2
+                y=y(:,1);
+            end
+            y = double(y);
+            st='test.wav';
+            audiowrite(st,y1,samplingfrequency);
+            %----- code for speaker recognition -------
+            disp('MFCC cofficients computation and VQ codebook training in progress...');
+            disp(' ');
+            % Number of centroids required
+            k =16;
+            
+            for ii=1:sound_number
+                % Compute MFCC cofficients for each sound present in database
+                v = mfcc(data{ii,1}, Fs);
+                % Train VQ codebook
+                code{ii} = vqlbg(v, k);
+                disp('...');
+            end
+            disp('Completed.');
+            % Compute MFCC coefficients for input sound
+            v = mfcc(y,Fs);
+            % Current distance and sound ID initialization
+            distmin = Inf;
+            k1 = 0;
+            
+            for ii=1:sound_number
+                d = disteu(v, code{ii});
+                dist = sum(min(d,[],2)) / size(d,1);
+                message=strcat('For User #',num2str(ii),' Dist : ',num2str(dist));
+                disp(message);
+                
+                if dist < distmin
+                    distmin = dist;
+                    k1 = ii;
+                end
+            end
+            
+            if distmin < jabba
+                min_index = k1;
+                speech_id = data{min_index,2};
+                %-----------------------------------------
+                disp('Matching sound:');
+                message=strcat('File:',data{min_index,3});
+                disp(message);
+                message = strcat('Recognized speaker ID: ',speech_id);
+                disp(message);
+                msgbox(message,'Matching result','help');
+                
+                ch3=0;
+                while ch3~=3
+                    ch3=menu('Matched result verification:','Recognized Sound','Recorded sound','Exit');
+                    
+                    if ch3==1
+                        st=strcat(num2str(k1),'.wav');
+                        [s ,fs ]=audioread(st);
+                        p=audioplayer(s,fs);
+                        play(p);
+                    end
+                    
+                    if ch3==2
+                        [s ,fs]=audioread('test.wav');
+                        p=audioplayer(s,fs);
+                        play(p);
+                    end
+                end
+                
+            else
+                warndlg('Wrong User . No matching Result.',' Warning ')
+            end
+        else
+            warndlg('Database is empty. No matching is possible.',' Warning ')
+        end
+    end
+    
+    %% Database Information
+    
+    if ch==3
+        if (exist('name_database.dat','file'))
+            load('name_database.dat','-mat');
+            message=strcat('Database has #',num2str(sound_number),'words:');
+            disp(message);
+            disp(' ');
+            
+            for ii=1:sound_number
+                message=strcat('Location:',data{ii,3});
+                disp(message);
+                message=strcat('Sound ID:',num2str(data{ii,2}));
+                disp(message);
+                message=strcat('Speaker Number:',num2str(data{ii,4}));
+                disp(message);
+                disp('-');
+            end
+            
+            ch4=0;
+            while ch4 ~=3
+                ch4=menu('Database Information','Play Sound','Delete','Exit');
+                
+                if ch4==1
+                    
+                    st=strcat('Sound Database has : #',num2str(sound_number),...
+                        'words. Enter a database number : #');
+                    
+                    prompt = {st};
+                    dlg_title = 'Database Information';
+                    num_lines = 1;
+                    def = {'1'};
+                    options.Resize='on';
+                    options.WindowStyle='normal';
+                    options.Interpreter='tex';
+                    an = inputdlg(prompt,dlg_title,num_lines,def);
+                    an=cell2mat(an);
+                    a=str2double(an);
+                    
+                    if (isempty(an))
+                        warndlg('Empty','warning');
+                    else
+                        
+                       
+                            st=strcat(num2str(an),'.wav');
+                            [s ,fs ]=audioread(st);
+                            p=audioplayer(s,fs);
+                            play(p);
+                    end
+                end
+                
+%% Delete Database
+                
+                if ch4==2
+                    button = questdlg('Do you really want to remove the Database?');
+                    
+                    if strcmp(button,'Yes')
+                        
+                        prompt={'Enter speaker_number you want to delete'};
+                        dlgtitle='Delete audio';
+                        dims=[1 40];
+                        definput={'1'};
+                        def_id=inputdlg(prompt,dlgtitle,dims,definput);
+                        def_id=cell2mat(def_id);
+                        dlt_id=find(cell2mat(data(:,4))==def_id);
+                        
+                        %for ii=1:sound_number
+                        st=strcat(num2str(def_id),'.wav');
+                        delete(st);
+                        data(dlt_id,:)=[];
+                        sound_number=sound_number-1;
+                        save('name_database.dat','data','sound_number','speaker_num','samplingfrequency','samplingbits');
+                        %end
+                        
+                        if (exist('test.wav','file'))
+                            delete('test.wav');
+                        end
+                        
+                    end
+                    disp(data);
+                end
+                
+                
+            end
+        else
+            warndlg('Database is empty.',' Warning ')
+        end
+    end
+    
+end
+close all;
+msgbox('Thank You');
+
+
+
+%% Feature Extraction
+% Feature Extraction is basically the fundamental parameters identifying a speech signal. MFCC is the most frequently used method in speaker recognition which is implemented using MATLAB.
+% The steps in features extraction are given below:
+
+%% Frame Blocking
+% It is the process of dividing the audio signal into specified number of small overlapping frames. The frames can then be processed independently, allowing for the application of different audio processing techniques to each frame. The frame blocking process is applied both for the sound in the database and for the input signal.
+function M3 = blockFrames(s,fs, m, n)
+l = length(s);
+nbFrame = floor((l - n) / m) + 1;
+for i = 1:n
+    for j = 1:nbFrame
+        M(i, j) = s(((j - 1) * m) + i);
+    end
+end
+%% Windowing
+% Hamming window is used to remove the discontinuities from the beginning and from the end of each framed data or signal.
+h = hamming(n);
+M2 = diag(h) * M;
+%% Fast Fourier Transform
+% FFT is applied to the windowed data to find the frequency components of the signal.
+for i = 1:nbFrame
+    M3(:, i) = fft(M2(:, i)); 
+end
+end
+
+%% Mel Frequency Filter:
+% Mel frequency wrapping is a process of mapping the linear frequency scale (in Hertz) to the mel frequency scale (in mel). The main purpose of mel frequency wrapping is to convert the linearly spaced frequency components obtained from a Fourier transform into mel-spaced frequency components, which better reflect the way humans perceive sound.
+% The function first sets the base frequency 700/fs, which is the lowest frequency considered in the filter bank. It then calculates the log-spaced frequency intervals. Then, it calculates the frequency range of each filterbank in terms of FFT bin numbers and the contribution of each FFT bin to each filterbank. Which is then stored in a matrix corresponding to each bin.
+function m = melfb(p, n, fs)
+% MELFB Determine matrix for a mel-spaced filterbank 
+% 
+% Inputs: p number of filters in filterbank 
+% n length of fft 
+% fs sample rate in Hz 
+% 
+% Outputs: x a (sparse) matrix containing the filterbank amplitudes 
+f0 = 700 / fs; 
+fn2 = floor(n/2); 
+lr = log(1 + 0.5/f0) / (p+1); 
+% convert to fft bin numbers with 0 for DC term 
+bl = n * (f0 * (exp([0 1 p p+1] * lr) - 1)); 
+b1 = floor(bl(1)) + 1; 
+b2 = ceil(bl(2)); 
+b3 = floor(bl(3)); 
+b4 = min(fn2, ceil(bl(4))) - 1; 
+pf = log(1 + (b1:b4)/n/f0) / lr; 
+fp = floor(pf); 
+pm = pf - fp; 
+r = [fp(b2:b4) 1+fp(1:b3)]; 
+c = [b2:b4 1:b3] + 1; 
+v = 2 * [1-pm(b2:b4) pm(1:b3)]; 
+m = sparse(r, c, v, p, 1+fn2); 
+end
+%% Cepstrum
+% Cepstrum is a signal processing technique that involves taking the inverse Fourier transform (or the discrete Cosine Transform) of the logarithm of the magnitude of the Fourier transform of a signal. The result is a representation of the signal's frequency content in a way that highlights periodicities and regularities in the signal.
+function r = mfcc(s, fs)
+m = 100;
+n = 256;
+frame=blockFrames(s, fs, m, n);
+m = melfb(20, n, fs);
+n2 = 1 + floor(n / 2);
+z = m * abs(frame(1:n2, :)).^2;
+r = dct(log(z));
+end
+%% Feature Matching
+% The steps involved in the feature matching are:
+% Vector Quantization:  Vector quantization with the Linde-Buzo-Gray (LBG) algorithm, a clustering technique used in signal processing and data compression.  
+% The input to the function is a dataset of vectors (d) and the desired number of codebook vectors (k). The output is a codebook of k vectors that best represents the dataset, minimizing the distortion between the original vectors and their corresponding codebook vectors.
+% The algorithm starts by initializing the codebook with the mean vector of the dataset. Then, for each iteration, it doubles the size of the codebook by creating two copies of each codebook vector and slightly perturbing them.
+% Next, it assigns each vector in the dataset to its nearest codebook vector and updates the codebook by taking the mean of the assigned vectors in each cluster. This process is repeated until the distortion between the previous and current iterations is below a certain threshold (e).
+% The algorithm continues to double the size of the codebook and update it until it reaches the desired size (k).
+function r = vqlbg(d,k)
+e = .01;
+r = mean(d, 2);
+dpr = 10000;
+for i = 1:log2(k)
+    r = [r*(1+e), r*(1-e)];
+    while (1 == 1)
+        z = disteu(d, r);
+        [m,ind] = min(z, [], 2);
+        t = 0;
+        for j = 1:2^i
+            r(:, j) = mean(d(:, find(ind == j)), 2); %#ok<FNDSB>
+            x = disteu(d(:, find(ind == j)), r(:, j)); %#ok<FNDSB>
+            for q = 1:length(x)
+                t = t + x(q);
+            end
+        end
+        if (((dpr - t)/t) < e)
+            break;
+        else
+            dpr = t;
+        end
+    end
+end
+end
+%% Distance Measure:  
+% An unknown speaker%s voice is represented by a voice is represented by a sequence of feature of feature vector and then it is compared with the codebooks from the database. In order to identify the unknown speaker, this can be done by measuring the distortion distance of two vector sets based on minimizing the Euclidean distance.
+% It calculates the weighted distance between 'x' and 'y', where the weights are specified by the 'pesi' vector.
+% DISTEU Function
+% DISTEU Pairwise Euclidean distances between columns of two matrices 
+% 
+% Input: 
+% x, y: Two matrices whose each column is an a vector data. 
+% 
+% Output: 
+% d: Element d(i,j) will be the Euclidean distance between two 
+% column vectors X(:,i) and Y(:,j) 
+% 
+% Note: 
+% The Euclidean distance D between two vectors X and Y is: 
+% D = sum((x-y).^2).^0.5 
+ 	
+function d = disteu(x, y) 
+[M, N] = size(x);
+[M2, P] = size(y);
+if (M ~= M2) 
+error('Matrix dimensions do not match.') 
+end 
+d = zeros(N, P);
+for ii=1:N 
+for jj=1:P 
+%d(ii,jj)=sum((x(:,ii)-y(:,jj)).^2).^0.5; 
+d(ii,jj) = mydistance(x(:,ii),y(:,jj),2); 
+end 
+end
+end
+
+ 
+%% Mydistance Function
+% x and y are input 1D vectors 
+% out is the measured distance 
+% Euclidean distance 
+ 
+function [out] = mydistance(x,y,tipo) 
+if tipo == 0 
+out = sum((x-y).^2).^0.5; 
+end 
+% Distance sum | x -y | 
+if tipo == 1 
+out = sum(abs(x-y)); 
+end 
+% Weighted distance 
+if tipo == 2 
+pesi = zeros(size(x));
+pesi(1) = 0.20; 
+pesi(2) = 0.90; 
+pesi(3) = 0.95; 
+pesi(4) = 0.90; 
+pesi(5) = 0.70; 
+pesi(6) = 0.90; 
+pesi(7) = 1.00; 
+pesi(8) = 1.00; 
+pesi(9) = 1.00; 
+pesi(10) = 0.95; 
+pesi(11:13) = 0.30; 
+out = sum(abs(x-y).*pesi); 
+%out = sum(pesi.*(x-y).^2).^0.5; 
+end
+end
+
+%% The speaker who is identified is the one that has the smallest distance from the speakers in the database.
